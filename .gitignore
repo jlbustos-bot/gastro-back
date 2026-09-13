@@ -1,0 +1,12 @@
+# Variables de entorno y secretos
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Dependencias y compilados
+node_modules/
+dist/
+build/
+__pycache__/
