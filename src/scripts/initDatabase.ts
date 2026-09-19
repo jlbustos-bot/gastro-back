@@ -141,14 +141,8 @@ const initDatabase = async () => {
 
     const grupo1prodCheck = await pool.query('SELECT COUNT(*) FROM grupo1prod');
     if (grupo1prodCheck.rows[0].count === '0') {
-      await pool.query(
-        'INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2)',
-        ['Producto base', true]
-      );
-      await pool.query(
-        'INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2)',
-        ['Producto premium', true]
-      );
+      await pool.query('INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2)', ['Producto base', true]);
+      await pool.query('INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2)', ['Producto premium', false]);
       console.log('? Datos de prueba para grupo1prod insertados');
     }
 

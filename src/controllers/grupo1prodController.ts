@@ -40,16 +40,23 @@ export const getGrupo1ProdById = async (req: AuthRequest, res: Response): Promis
 
 export const createGrupo1Prod = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { nombre, activo }: Grupo1Prod = req.body;
+    const rawBody = req.body || {};
+    const nombre = String(rawBody.nombre ?? rawBody.name ?? '').trim();
+    const activoRaw = rawBody.activo ?? rawBody.active ?? true;
+    const activo = activoRaw === 'false' || activoRaw === '0' || activoRaw === 0 || activoRaw === false ? false : true;
 
     if (!nombre) {
-      res.status(400).json({ error: 'Faltan campos requeridos' });
+      res.status(400).json({
+        error: 'Faltan campos requeridos',
+        received: rawBody,
+        detalle: 'Se requiere un valor para nombre'
+      });
       return;
     }
 
     const result = await pool.query(
       'INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2) RETURNING *',
-      [nombre, activo ?? true]
+      [nombre, activo]
     );
 
     res.status(201).json(result.rows[0]);
@@ -61,10 +68,24 @@ export const createGrupo1Prod = async (req: AuthRequest, res: Response): Promise
 export const updateGrupo1Prod = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { nombre, activo }: Partial<Grupo1Prod> = req.body;
+    const rawBody = req.body || {};
+    const nombre = String(rawBody.nombre ?? rawBody.name ?? '').trim();
+    const activoRaw = rawBody.activo ?? rawBody.active ?? undefined;
+    const activo = activoRaw === undefined ? undefined : (
+      activoRaw === 'false' || activoRaw === '0' || activoRaw === 0 || activoRaw === false ? false : true
+    );
+
+    if (!nombre || activo === undefined) {
+      res.status(400).json({
+        error: 'Faltan campos requeridos',
+        received: rawBody,
+        detalle: 'Se requieren nombre y activo'
+      });
+      return;
+    }
 
     const result = await pool.query(
-      'UPDATE grupo1prod SET nombre = COALESCE($1, nombre), activo = COALESCE($2, activo) WHERE id = $3 RETURNING *',
+      'UPDATE grupo1prod SET nombre = $1, activo = $2 WHERE id = $3 RETURNING *',
       [nombre, activo, id]
     );
 
