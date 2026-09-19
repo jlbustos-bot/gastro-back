@@ -7,7 +7,9 @@ import authRoutes from './routes/authRoutes';
 import restaurantRoutes from './routes/restaurantRoutes';
 import dishRoutes from './routes/dishRoutes';
 import orderRoutes from './routes/orderRoutes';
+import productoRoutes from './routes/productoRoutes';
 import grupo1prodRoutes from './routes/grupo1prodRoutes';
+import grupo2prodRoutes from './routes/grupo2prodRoutes';
 
 dotenv.config();
 
@@ -28,7 +30,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/dishes', dishRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/productos', productoRoutes);
 app.use('/api/grupo1prod', grupo1prodRoutes);
+app.use('/api/grupo2prod', grupo2prodRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

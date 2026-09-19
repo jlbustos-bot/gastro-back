@@ -116,11 +116,54 @@ const initDatabase = async () => {
     `);
     console.log('? Tabla grupo1prod creada');
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS grupo2prod (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        activo BOOLEAN DEFAULT true
+      );
+    `);
+    console.log('? Tabla grupo2prod creada');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS productos (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        nombrecorto VARCHAR(100) NOT NULL,
+        grupo1prod INTEGER,
+        grupo2prod INTEGER,
+        precioventa DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        activo BOOLEAN DEFAULT true,
+        CONSTRAINT fk_productos_grupo1prod FOREIGN KEY (grupo1prod) REFERENCES grupo1prod(id) ON DELETE SET NULL,
+        CONSTRAINT fk_productos_grupo2prod FOREIGN KEY (grupo2prod) REFERENCES grupo2prod(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('? Tabla productos creada');
+
     await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_restaurant ON orders(restaurant_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_dishes_menu ON dishes(menu_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_menus_restaurant ON menus(restaurant_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos(activo);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_grupo1prod_activo ON grupo1prod(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_grupo2prod_activo ON grupo2prod(activo);');
+
+    await pool.query(`
+      ALTER TABLE productos
+      DROP CONSTRAINT IF EXISTS fk_productos_grupo1prod;
+    `);
+    await pool.query(`
+      ALTER TABLE productos
+      ADD CONSTRAINT fk_productos_grupo1prod FOREIGN KEY (grupo1prod) REFERENCES grupo1prod(id) ON DELETE SET NULL;
+    `);
+    await pool.query(`
+      ALTER TABLE productos
+      DROP CONSTRAINT IF EXISTS fk_productos_grupo2prod;
+    `);
+    await pool.query(`
+      ALTER TABLE productos
+      ADD CONSTRAINT fk_productos_grupo2prod FOREIGN KEY (grupo2prod) REFERENCES grupo2prod(id) ON DELETE SET NULL;
+    `);
     console.log('? �ndices creados');
 
     const adminCheck = await pool.query('SELECT * FROM users WHERE username = $1', ['admin']);
@@ -144,6 +187,25 @@ const initDatabase = async () => {
       await pool.query('INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2)', ['Producto base', true]);
       await pool.query('INSERT INTO grupo1prod (nombre, activo) VALUES ($1, $2)', ['Producto premium', false]);
       console.log('? Datos de prueba para grupo1prod insertados');
+    }
+
+    const grupo2prodCheck = await pool.query('SELECT COUNT(*) FROM grupo2prod');
+    if (grupo2prodCheck.rows[0].count === '0') {
+      await pool.query('INSERT INTO grupo2prod (nombre, activo) VALUES ($1, $2)', ['Producto base 2', true]);
+      await pool.query('INSERT INTO grupo2prod (nombre, activo) VALUES ($1, $2)', ['Producto premium 2', false]);
+      console.log('? Datos de prueba para grupo2prod insertados');
+    }
+
+    const productosCheck = await pool.query('SELECT COUNT(*) FROM productos');
+    if (productosCheck.rows[0].count === '0') {
+      const grupo1Result = await pool.query('SELECT id FROM grupo1prod ORDER BY id LIMIT 1');
+      const grupo2Result = await pool.query('SELECT id FROM grupo2prod ORDER BY id LIMIT 1');
+      const grupo1Id = grupo1Result.rows[0]?.id ?? 1;
+      const grupo2Id = grupo2Result.rows[0]?.id ?? 1;
+
+      await pool.query('INSERT INTO productos (nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo) VALUES ($1, $2, $3, $4, $5, $6)', ['Producto base', 'PB', grupo1Id, grupo2Id, 25.99, true]);
+      await pool.query('INSERT INTO productos (nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo) VALUES ($1, $2, $3, $4, $5, $6)', ['Producto premium', 'PP', grupo1Id, grupo2Id, 39.99, false]);
+      console.log('? Datos de prueba para productos insertados');
     }
 
     const restaurantCheck = await pool.query('SELECT COUNT(*) FROM restaurants');

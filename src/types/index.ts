@@ -71,7 +71,23 @@ export interface Inventory {
   updated_at?: Date;
 }
 
+export interface Producto {
+  id?: number;
+  nombre: string;
+  nombrecorto: string;
+  grupo1prod?: number | null;
+  grupo2prod?: number | null;
+  precioventa: number;
+  activo: boolean;
+}
+
 export interface Grupo1Prod {
+  id?: number;
+  nombre: string;
+  activo: boolean;
+}
+
+export interface Grupo2Prod {
   id?: number;
   nombre: string;
   activo: boolean;
