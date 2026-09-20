@@ -140,6 +140,64 @@ const initDatabase = async () => {
     `);
     console.log('? Tabla productos creada');
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS clientes (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        apellido VARCHAR(255) NOT NULL,
+        documento VARCHAR(50),
+        telefono VARCHAR(50),
+        email VARCHAR(255),
+        direccion VARCHAR(255),
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('? Tabla clientes creada');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS mesas (
+        id SERIAL PRIMARY KEY,
+        numero INTEGER NOT NULL UNIQUE,
+        capacidad INTEGER NOT NULL DEFAULT 1,
+        ubicacion VARCHAR(100),
+        estado VARCHAR(50) DEFAULT 'libre',
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('? Tabla mesas creada');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS consumos (
+        id SERIAL PRIMARY KEY,
+        mesa_id INTEGER NOT NULL,
+        cliente_id INTEGER,
+        estado VARCHAR(50) DEFAULT 'abierta',
+        total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_consumos_mesa FOREIGN KEY (mesa_id) REFERENCES mesas(id) ON DELETE CASCADE,
+        CONSTRAINT fk_consumos_cliente FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('? Tabla consumos creada');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS consumo_items (
+        id SERIAL PRIMARY KEY,
+        consumo_id INTEGER NOT NULL,
+        producto_id INTEGER NOT NULL,
+        cantidad INTEGER NOT NULL DEFAULT 1,
+        precio DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        CONSTRAINT fk_consumo_items_consumo FOREIGN KEY (consumo_id) REFERENCES consumos(id) ON DELETE CASCADE,
+        CONSTRAINT fk_consumo_items_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
+      );
+    `);
+    console.log('? Tabla consumo_items creada');
+
     await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_restaurant ON orders(restaurant_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_dishes_menu ON dishes(menu_id);');
@@ -147,6 +205,11 @@ const initDatabase = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos(activo);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_grupo1prod_activo ON grupo1prod(activo);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_grupo2prod_activo ON grupo2prod(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_clientes_activo ON clientes(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_mesas_estado ON mesas(estado);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_mesa ON consumos(mesa_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_cliente ON consumos(cliente_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_estado ON consumos(estado);');
 
     await pool.query(`
       ALTER TABLE productos
@@ -206,6 +269,49 @@ const initDatabase = async () => {
       await pool.query('INSERT INTO productos (nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo) VALUES ($1, $2, $3, $4, $5, $6)', ['Producto base', 'PB', grupo1Id, grupo2Id, 25.99, true]);
       await pool.query('INSERT INTO productos (nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo) VALUES ($1, $2, $3, $4, $5, $6)', ['Producto premium', 'PP', grupo1Id, grupo2Id, 39.99, false]);
       console.log('? Datos de prueba para productos insertados');
+    }
+
+    const clientesCheck = await pool.query('SELECT COUNT(*) FROM clientes');
+    if (clientesCheck.rows[0].count === '0') {
+      await pool.query(
+        'INSERT INTO clientes (nombre, apellido, documento, telefono, email, direccion, activo) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        ['Juan', 'Pérez', '30111222', '555-1000', 'juan.perez@mail.com', 'Av. Siempre Viva 123', true]
+      );
+      await pool.query(
+        'INSERT INTO clientes (nombre, apellido, documento, telefono, email, direccion, activo) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        ['María', 'Gómez', '27888999', '555-2000', 'maria.gomez@mail.com', 'Calle Falsa 456', true]
+      );
+      console.log('? Datos de prueba para clientes insertados');
+    }
+
+    const mesasCheck = await pool.query('SELECT COUNT(*) FROM mesas');
+    if (mesasCheck.rows[0].count === '0') {
+      await pool.query('INSERT INTO mesas (numero, capacidad, ubicacion, estado, activo) VALUES ($1, $2, $3, $4, $5)', [1, 4, 'Salón principal', 'libre', true]);
+      await pool.query('INSERT INTO mesas (numero, capacidad, ubicacion, estado, activo) VALUES ($1, $2, $3, $4, $5)', [2, 6, 'Terraza', 'libre', true]);
+      console.log('? Datos de prueba para mesas insertados');
+    }
+
+    const consumoCheck = await pool.query('SELECT COUNT(*) FROM consumos');
+    if (consumoCheck.rows[0].count === '0') {
+      const mesaResult = await pool.query('SELECT id FROM mesas ORDER BY id LIMIT 1');
+      const clienteResult = await pool.query('SELECT id FROM clientes ORDER BY id LIMIT 1');
+      const productoResult = await pool.query('SELECT id, precioventa FROM productos ORDER BY id LIMIT 1');
+      const mesaId = mesaResult.rows[0]?.id;
+      const clienteId = clienteResult.rows[0]?.id;
+      const producto = productoResult.rows[0];
+
+      if (mesaId && producto) {
+        const consumoResult = await pool.query(
+          'INSERT INTO consumos (mesa_id, cliente_id, estado, total) VALUES ($1, $2, $3, $4) RETURNING id',
+          [mesaId, clienteId, 'abierta', Number(producto.precioventa)]
+        );
+        await pool.query(
+          'INSERT INTO consumo_items (consumo_id, producto_id, cantidad, precio) VALUES ($1, $2, $3, $4)',
+          [consumoResult.rows[0].id, producto.id, 1, Number(producto.precioventa)]
+        );
+        await pool.query('UPDATE mesas SET estado = $1 WHERE id = $2', ['ocupada', mesaId]);
+        console.log('? Datos de prueba para consumos insertados');
+      }
     }
 
     const restaurantCheck = await pool.query('SELECT COUNT(*) FROM restaurants');

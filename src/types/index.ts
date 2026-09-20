@@ -93,6 +93,52 @@ export interface Grupo2Prod {
   activo: boolean;
 }
 
+export interface Cliente {
+  id?: number;
+  nombre: string;
+  apellido: string;
+  documento?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  activo: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface Mesa {
+  id?: number;
+  numero: number;
+  capacidad: number;
+  ubicacion?: string;
+  estado: 'libre' | 'ocupada' | 'reservada' | 'inactiva';
+  activo: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface ConsumoItem {
+  id?: number;
+  consumo_id?: number;
+  producto_id: number;
+  cantidad: number;
+  precio: number;
+  producto_nombre?: string;
+}
+
+export interface Consumo {
+  id?: number;
+  mesa_id: number;
+  cliente_id?: number | null;
+  estado: 'abierta' | 'pagada' | 'anulada';
+  total: number;
+  created_at?: Date;
+  updated_at?: Date;
+  mesa_numero?: number;
+  cliente_nombre?: string;
+  items?: ConsumoItem[];
+}
+
 export interface AuthRequest extends Request {
   user?: {
     id: number;
