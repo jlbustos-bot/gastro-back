@@ -35,12 +35,14 @@ export const getAllProductos = async (req: AuthRequest, res: Response): Promise<
     const { activo } = req.query;
     const activoValue = Array.isArray(activo) ? activo[0] : activo;
     let query = `
-      SELECT p.*, 
+      SELECT p.*,
              g1.nombre AS grupo1prod_nombre,
-             g2.nombre AS grupo2prod_nombre
+             g2.nombre AS grupo2prod_nombre,
+             pr.nombre AS proveedor_nombre
       FROM productos p
       LEFT JOIN grupo1prod g1 ON g1.id = p.grupo1prod
       LEFT JOIN grupo2prod g2 ON g2.id = p.grupo2prod
+      LEFT JOIN proveedores pr ON pr.id = p.proveedor_id
       WHERE 1=1`;
     const params: any[] = [];
 
@@ -63,10 +65,12 @@ export const getProductoById = async (req: AuthRequest, res: Response): Promise<
     const result = await pool.query(`
       SELECT p.*,
              g1.nombre AS grupo1prod_nombre,
-             g2.nombre AS grupo2prod_nombre
+             g2.nombre AS grupo2prod_nombre,
+             pr.nombre AS proveedor_nombre
       FROM productos p
       LEFT JOIN grupo1prod g1 ON g1.id = p.grupo1prod
       LEFT JOIN grupo2prod g2 ON g2.id = p.grupo2prod
+      LEFT JOIN proveedores pr ON pr.id = p.proveedor_id
       WHERE p.id = $1`, [id]);
 
     if (result.rows.length === 0) {
@@ -90,9 +94,11 @@ export const createProducto = async (req: AuthRequest, res: Response): Promise<v
     const grupo1prodRaw = rawBody.grupo1prod ?? rawBody.grupo1Prod ?? rawBody.grupo_1_prod ?? null;
     const grupo2prodRaw = rawBody.grupo2prod ?? rawBody.grupo2Prod ?? rawBody.grupo_2_prod ?? null;
     const precioventaRaw = rawBody.precioventa ?? rawBody.precioVenta ?? rawBody.precio_venta ?? 0;
+    const proveedorIdRaw = rawBody.proveedor_id ?? rawBody.proveedorId ?? rawBody.proveedor ?? null;
 
     const grupo1prod = grupo1prodRaw === null || grupo1prodRaw === '' ? null : Number(grupo1prodRaw);
     const grupo2prod = grupo2prodRaw === null || grupo2prodRaw === '' ? null : Number(grupo2prodRaw);
+    const proveedorId = proveedorIdRaw === null || proveedorIdRaw === '' ? null : Number(proveedorIdRaw);
     const precioventa = Number(precioventaRaw || 0);
 
     if (!nombre || !nombrecorto) {
@@ -110,9 +116,12 @@ export const createProducto = async (req: AuthRequest, res: Response): Promise<v
     const validGrupo2 = await validateReference(res, 'grupo2prod', grupo2prod, 'grupo2prod');
     if (!validGrupo2) return;
 
+    const validProveedor = await validateReference(res, 'proveedores', proveedorId, 'proveedor_id');
+    if (!validProveedor) return;
+
     const result = await pool.query(
-      'INSERT INTO productos (nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo]
+      'INSERT INTO productos (nombre, nombrecorto, grupo1prod, grupo2prod, proveedor_id, precioventa, activo) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [nombre, nombrecorto, grupo1prod, grupo2prod, proveedorId, precioventa, activo]
     );
 
     res.status(201).json(result.rows[0]);
@@ -131,11 +140,13 @@ export const updateProducto = async (req: AuthRequest, res: Response): Promise<v
     const grupo1prodRaw = rawBody.grupo1prod ?? rawBody.grupo1Prod ?? rawBody.grupo_1_prod ?? undefined;
     const grupo2prodRaw = rawBody.grupo2prod ?? rawBody.grupo2Prod ?? rawBody.grupo_2_prod ?? undefined;
     const precioventaRaw = rawBody.precioventa ?? rawBody.precioVenta ?? rawBody.precio_venta ?? undefined;
+    const proveedorIdRaw = rawBody.proveedor_id ?? rawBody.proveedorId ?? rawBody.proveedor ?? undefined;
     const activo = activoRaw === undefined ? undefined : (
       activoRaw === 'false' || activoRaw === '0' || activoRaw === 0 || activoRaw === false ? false : true
     );
     const grupo1prod = grupo1prodRaw === undefined || grupo1prodRaw === '' || grupo1prodRaw === null ? null : Number(grupo1prodRaw);
     const grupo2prod = grupo2prodRaw === undefined || grupo2prodRaw === '' || grupo2prodRaw === null ? null : Number(grupo2prodRaw);
+    const proveedorId = proveedorIdRaw === undefined || proveedorIdRaw === '' || proveedorIdRaw === null ? null : Number(proveedorIdRaw);
     const precioventa = precioventaRaw === undefined ? undefined : Number(precioventaRaw || 0);
 
     if (!nombre || !nombrecorto || activo === undefined || precioventa === undefined) {
@@ -153,9 +164,12 @@ export const updateProducto = async (req: AuthRequest, res: Response): Promise<v
     const validGrupo2 = await validateReference(res, 'grupo2prod', grupo2prod, 'grupo2prod');
     if (!validGrupo2) return;
 
+    const validProveedor = await validateReference(res, 'proveedores', proveedorId, 'proveedor_id');
+    if (!validProveedor) return;
+
     const result = await pool.query(
-      'UPDATE productos SET nombre = $1, nombrecorto = $2, grupo1prod = $3, grupo2prod = $4, precioventa = $5, activo = $6 WHERE id = $7 RETURNING *',
-      [nombre, nombrecorto, grupo1prod, grupo2prod, precioventa, activo, id]
+      'UPDATE productos SET nombre = $1, nombrecorto = $2, grupo1prod = $3, grupo2prod = $4, proveedor_id = $5, precioventa = $6, activo = $7 WHERE id = $8 RETURNING *',
+      [nombre, nombrecorto, grupo1prod, grupo2prod, proveedorId, precioventa, activo, id]
     );
 
     if (result.rows.length === 0) {

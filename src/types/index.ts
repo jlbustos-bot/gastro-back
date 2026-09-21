@@ -16,59 +16,8 @@ export interface Restaurant {
   address: string;
   phone: string;
   email: string;
+  logo?: string;
   created_at?: Date;
-}
-
-export interface Menu {
-  id?: number;
-  restaurant_id: number;
-  name: string;
-  description?: string;
-  active: boolean;
-  created_at?: Date;
-}
-
-export interface Dish {
-  id?: number;
-  menu_id: number;
-  name: string;
-  description?: string;
-  price: number;
-  category: string;
-  available: boolean;
-  preparation_time?: number;
-  created_at?: Date;
-}
-
-export interface Order {
-  id?: number;
-  restaurant_id: number;
-  user_id: number;
-  table_number?: number;
-  status: 'pending' | 'preparing' | 'ready' | 'served' | 'cancelled';
-  total_price: number;
-  created_at?: Date;
-  updated_at?: Date;
-}
-
-export interface OrderItem {
-  id?: number;
-  order_id: number;
-  dish_id: number;
-  quantity: number;
-  price: number;
-  notes?: string;
-}
-
-export interface Inventory {
-  id?: number;
-  restaurant_id: number;
-  item_name: string;
-  quantity: number;
-  unit: string;
-  min_quantity: number;
-  created_at?: Date;
-  updated_at?: Date;
 }
 
 export interface Producto {
@@ -77,6 +26,7 @@ export interface Producto {
   nombrecorto: string;
   grupo1prod?: number | null;
   grupo2prod?: number | null;
+  proveedor_id?: number | null;
   precioventa: number;
   activo: boolean;
 }
@@ -137,6 +87,49 @@ export interface Consumo {
   mesa_numero?: number;
   cliente_nombre?: string;
   items?: ConsumoItem[];
+}
+
+export interface MedioPago {
+  id?: number;
+  nombre: string;
+  descripcion?: string;
+  activo: boolean;
+}
+
+export interface Proveedor {
+  id?: number;
+  nombre: string;
+  cuit?: string;
+  telefono?: string;
+  email?: string;
+  direccion?: string;
+  observaciones?: string;
+  activo: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface ProductoProveedor {
+  id?: number;
+  producto_id: number;
+  proveedor_id: number;
+  precio_por_litro: number;
+  precio_barril: number;
+  precio_venta_sugerido: number;
+  activo: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+  producto_nombre?: string;
+  proveedor_nombre?: string;
+}
+
+export interface ParametroProducto {
+  id?: number;
+  cantidad_barril_cerveza: number;
+  coeficiente_precio_venta: number;
+  activo: boolean;
+  created_at?: Date;
+  updated_at?: Date;
 }
 
 export interface AuthRequest extends Request {

@@ -10,7 +10,11 @@ export const getAllConsumos = async (req: AuthRequest, res: Response): Promise<v
     const estadoValue = Array.isArray(estado) ? estado[0] : estado;
     let query = `
       SELECT c.*, m.numero AS mesa_numero,
-             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre
+             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre,
+             (SELECT string_agg(mp.nombre, ', ' ORDER BY cp.id)
+              FROM consumo_pagos cp
+              JOIN medios_pago mp ON mp.id = cp.medio_pago_id
+              WHERE cp.consumo_id = c.id) AS medio_pago_nombre
       FROM consumos c
       LEFT JOIN mesas m ON m.id = c.mesa_id
       LEFT JOIN clientes cl ON cl.id = c.cliente_id
@@ -35,10 +39,12 @@ export const getConsumoById = async (req: AuthRequest, res: Response): Promise<v
     const { id } = req.params;
     const consumoResult = await pool.query(`
       SELECT c.*, m.numero AS mesa_numero,
-             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre
+             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre,
+             mp.nombre AS medio_pago_nombre
       FROM consumos c
       LEFT JOIN mesas m ON m.id = c.mesa_id
       LEFT JOIN clientes cl ON cl.id = c.cliente_id
+      LEFT JOIN medios_pago mp ON mp.id = c.medio_pago_id
       WHERE c.id = $1`, [id]);
 
     if (consumoResult.rows.length === 0) {
@@ -53,9 +59,17 @@ export const getConsumoById = async (req: AuthRequest, res: Response): Promise<v
       WHERE ci.consumo_id = $1
       ORDER BY ci.id`, [id]);
 
+    const pagosResult = await pool.query(`
+      SELECT cp.*, mp.nombre AS medio_pago_nombre
+      FROM consumo_pagos cp
+      LEFT JOIN medios_pago mp ON mp.id = cp.medio_pago_id
+      WHERE cp.consumo_id = $1
+      ORDER BY cp.id`, [id]);
+
     res.json({
       ...consumoResult.rows[0],
       items: itemsResult.rows,
+      pagos: pagosResult.rows,
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Error al obtener consumo', details: error.message });
@@ -76,6 +90,26 @@ const setMesaState = async (client: any, mesaId: number, estado: string): Promis
   await client.query('UPDATE mesas SET estado = $1, updated_at = NOW() WHERE id = $2', [estado, mesaId]);
 };
 
+const toDateString = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getFechasConsumo = (): { fechaCreacion: string; fechaCaja: string } => {
+  const now = new Date();
+  const fechaCreacion = toDateString(now);
+
+  const cajaDate = new Date(now);
+  if (now.getHours() < 8) {
+    cajaDate.setDate(cajaDate.getDate() - 1);
+  }
+  const fechaCaja = toDateString(cajaDate);
+
+  return { fechaCreacion, fechaCaja };
+};
+
 export const createConsumo = async (req: AuthRequest, res: Response): Promise<void> => {
   const client = await pool.connect();
   try {
@@ -87,9 +121,18 @@ export const createConsumo = async (req: AuthRequest, res: Response): Promise<vo
     const clienteId = clienteIdRaw === undefined || clienteIdRaw === null || clienteIdRaw === '' ? null : Number(clienteIdRaw);
     const estado = String(rawBody.estado ?? rawBody.status ?? 'abierta').trim() || 'abierta';
     const itemsRaw = rawBody.items;
+    const medioPagoRaw = rawBody.medio_pago_id ?? rawBody.medioPagoId;
+    const medioPagoId = medioPagoRaw === undefined || medioPagoRaw === null || medioPagoRaw === ''
+      ? null
+      : Number(medioPagoRaw);
 
     if (isNaN(mesaId)) {
       res.status(400).json({ error: 'La mesa es obligatoria' });
+      return;
+    }
+
+    if (medioPagoId !== null && isNaN(medioPagoId)) {
+      res.status(400).json({ error: 'El medio de pago es inválido' });
       return;
     }
 
@@ -105,9 +148,20 @@ export const createConsumo = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    if (medioPagoId !== null) {
+      const medioPagoResult = await client.query('SELECT id FROM medios_pago WHERE id = $1', [medioPagoId]);
+      if (medioPagoResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'El medio de pago seleccionado no existe' });
+        return;
+      }
+    }
+
+    const { fechaCreacion, fechaCaja } = getFechasConsumo();
+
     const consumoResult = await client.query(
-      'INSERT INTO consumos (mesa_id, cliente_id, estado, total) VALUES ($1, $2, $3, 0) RETURNING *',
-      [mesaId, clienteId, estado]
+      'INSERT INTO consumos (mesa_id, cliente_id, estado, total, medio_pago_id, fecha_creacion, fecha_caja) VALUES ($1, $2, $3, 0, $4, $5, $6) RETURNING *',
+      [mesaId, clienteId, estado, medioPagoId, fechaCreacion, fechaCaja]
     );
     const consumo = consumoResult.rows[0];
 
@@ -140,16 +194,112 @@ export const createConsumo = async (req: AuthRequest, res: Response): Promise<vo
 
     const result = await pool.query(`
       SELECT c.*, m.numero AS mesa_numero,
-             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre
+             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre,
+             mp.nombre AS medio_pago_nombre
       FROM consumos c
       LEFT JOIN mesas m ON m.id = c.mesa_id
       LEFT JOIN clientes cl ON cl.id = c.cliente_id
+      LEFT JOIN medios_pago mp ON mp.id = c.medio_pago_id
       WHERE c.id = $1`, [consumo.id]);
 
     res.status(201).json({ ...result.rows[0], total });
   } catch (error: any) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: 'Error al crear consumo', details: error.message });
+  } finally {
+    client.release();
+  }
+};
+
+export const payConsumo = async (req: AuthRequest, res: Response): Promise<void> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const rawBody = req.body || {};
+    const rawPagos = rawBody.pagos ?? rawBody.payments;
+    const userId = req.user?.id ?? null;
+
+    if (!Array.isArray(rawPagos) || rawPagos.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ error: 'Debe registrar al menos un pago' });
+      return;
+    }
+
+    const consumoResult = await client.query('SELECT * FROM consumos WHERE id = $1 FOR UPDATE', [id]);
+    if (consumoResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      res.status(404).json({ error: 'Consumo no encontrado' });
+      return;
+    }
+    const consumo = consumoResult.rows[0];
+
+    if (consumo.estado !== 'abierta') {
+      await client.query('ROLLBACK');
+      res.status(400).json({ error: 'El consumo no se encuentra abierto' });
+      return;
+    }
+
+    let totalPagado = 0;
+    for (const pago of rawPagos) {
+      const medioId = Number(pago.medio_pago_id ?? pago.medioPagoId);
+      const monto = Number(pago.monto ?? pago.amount ?? 0);
+
+      if (isNaN(medioId) || isNaN(monto) || monto <= 0) {
+        throw new Error('Pago inválido: medio de pago y monto son obligatorios y el monto debe ser mayor a 0');
+      }
+
+      const medioResult = await client.query('SELECT id FROM medios_pago WHERE id = $1', [medioId]);
+      if (medioResult.rows.length === 0) {
+        throw new Error(`Medio de pago ${medioId} no encontrado`);
+      }
+
+      await client.query(
+        'INSERT INTO consumo_pagos (consumo_id, medio_pago_id, monto, user_id) VALUES ($1, $2, $3, $4)',
+        [consumo.id, medioId, monto, userId]
+      );
+      totalPagado += monto;
+    }
+
+    totalPagado = Math.round(totalPagado * 100) / 100;
+    const consumoTotal = Math.round(Number(consumo.total) * 100) / 100;
+
+    if (Math.abs(totalPagado - consumoTotal) > 0.01) {
+      throw new Error(`El total pagado (${totalPagado.toFixed(2)}) no coincide con el total del consumo (${consumoTotal.toFixed(2)})`);
+    }
+
+    await client.query(
+      'UPDATE consumos SET estado = $1, updated_at = NOW() WHERE id = $2',
+      ['pagada', consumo.id]
+    );
+    await setMesaState(client, consumo.mesa_id, 'libre');
+
+    await client.query('COMMIT');
+
+    const result = await pool.query(`
+      SELECT c.*, m.numero AS mesa_numero,
+             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre,
+             (SELECT string_agg(mp.nombre, ', ' ORDER BY cp.id)
+              FROM consumo_pagos cp
+              JOIN medios_pago mp ON mp.id = cp.medio_pago_id
+              WHERE cp.consumo_id = c.id) AS medio_pago_nombre
+      FROM consumos c
+      LEFT JOIN mesas m ON m.id = c.mesa_id
+      LEFT JOIN clientes cl ON cl.id = c.cliente_id
+      WHERE c.id = $1`, [consumo.id]);
+
+    const pagosResult = await pool.query(`
+      SELECT cp.*, mp.nombre AS medio_pago_nombre
+      FROM consumo_pagos cp
+      LEFT JOIN medios_pago mp ON mp.id = cp.medio_pago_id
+      WHERE cp.consumo_id = $1
+      ORDER BY cp.id`, [id]);
+
+    res.json({ ...result.rows[0], pagos: pagosResult.rows });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    res.status(400).json({ error: 'Error al registrar el pago', details: error.message });
   } finally {
     client.release();
   }
@@ -179,10 +329,20 @@ export const updateConsumo = async (req: AuthRequest, res: Response): Promise<vo
       : (String(clienteIdRaw).trim() === '' ? null : Number(clienteIdRaw));
     const estadoRaw = rawBody.estado ?? rawBody.status;
     const estado = estadoRaw === undefined || estadoRaw === null || estadoRaw === '' ? current.estado : String(estadoRaw).trim();
+    const medioPagoRaw = rawBody.medio_pago_id ?? rawBody.medioPagoId;
+    const medioPagoId = medioPagoRaw === undefined || medioPagoRaw === null || medioPagoRaw === ''
+      ? current.medio_pago_id ?? null
+      : Number(medioPagoRaw);
 
     if (!VALID_STATES.includes(estado)) {
       await client.query('ROLLBACK');
       res.status(400).json({ error: `Estado inválido. Valores permitidos: ${VALID_STATES.join(', ')}` });
+      return;
+    }
+
+    if (medioPagoId !== null && isNaN(medioPagoId)) {
+      await client.query('ROLLBACK');
+      res.status(400).json({ error: 'El medio de pago es inválido' });
       return;
     }
 
@@ -229,9 +389,18 @@ export const updateConsumo = async (req: AuthRequest, res: Response): Promise<vo
       }
     }
 
+    if (medioPagoId !== null) {
+      const medioPagoResult = await client.query('SELECT id FROM medios_pago WHERE id = $1', [medioPagoId]);
+      if (medioPagoResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'El medio de pago seleccionado no existe' });
+        return;
+      }
+    }
+
     await client.query(
-      'UPDATE consumos SET mesa_id = $1, cliente_id = $2, estado = $3, updated_at = NOW() WHERE id = $4',
-      [mesaId, clienteId, estado, id]
+      'UPDATE consumos SET mesa_id = $1, cliente_id = $2, estado = $3, medio_pago_id = $4, updated_at = NOW() WHERE id = $5',
+      [mesaId, clienteId, estado, medioPagoId, id]
     );
 
     await recalculateTotal(client, Number(id));
@@ -249,10 +418,12 @@ export const updateConsumo = async (req: AuthRequest, res: Response): Promise<vo
 
     const result = await pool.query(`
       SELECT c.*, m.numero AS mesa_numero,
-             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre
+             CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre,
+             mp.nombre AS medio_pago_nombre
       FROM consumos c
       LEFT JOIN mesas m ON m.id = c.mesa_id
       LEFT JOIN clientes cl ON cl.id = c.cliente_id
+      LEFT JOIN medios_pago mp ON mp.id = c.medio_pago_id
       WHERE c.id = $1`, [id]);
 
     res.json(result.rows[0]);

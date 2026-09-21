@@ -32,80 +32,10 @@ const initDatabase = async () => {
     console.log('? Tabla restaurants creada');
 
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS menus (
-        id SERIAL PRIMARY KEY,
-        restaurant_id INTEGER NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        description TEXT,
-        active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
-      );
+      ALTER TABLE restaurants
+      ADD COLUMN IF NOT EXISTS logo TEXT;
     `);
-    console.log('? Tabla menus creada');
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS dishes (
-        id SERIAL PRIMARY KEY,
-        menu_id INTEGER NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        description TEXT,
-        price DECIMAL(10, 2) NOT NULL,
-        category VARCHAR(100) NOT NULL,
-        available BOOLEAN DEFAULT true,
-        preparation_time INTEGER DEFAULT 15,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE
-      );
-    `);
-    console.log('? Tabla dishes creada');
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS orders (
-        id SERIAL PRIMARY KEY,
-        restaurant_id INTEGER NOT NULL,
-        user_id INTEGER,
-        table_number INTEGER,
-        status VARCHAR(50) DEFAULT 'pending',
-        total_price DECIMAL(10, 2) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-      );
-    `);
-    console.log('? Tabla orders creada');
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS order_items (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER NOT NULL,
-        dish_id INTEGER NOT NULL,
-        quantity INTEGER NOT NULL,
-        price DECIMAL(10, 2) NOT NULL,
-        notes TEXT,
-        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-        FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
-      );
-    `);
-    console.log('? Tabla order_items creada');
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS inventory (
-        id SERIAL PRIMARY KEY,
-        restaurant_id INTEGER NOT NULL,
-        item_name VARCHAR(255) NOT NULL,
-        quantity DECIMAL(10, 2) NOT NULL,
-        unit VARCHAR(50) NOT NULL,
-        min_quantity DECIMAL(10, 2) NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE
-      );
-    `);
-    console.log('? Tabla inventory creada');
+    console.log('? Columna logo agregada a restaurants');
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS grupo1prod (
@@ -186,6 +116,16 @@ const initDatabase = async () => {
     console.log('? Tabla consumos creada');
 
     await pool.query(`
+      ALTER TABLE consumos
+      ADD COLUMN IF NOT EXISTS fecha_creacion DATE;
+    `);
+    await pool.query(`
+      ALTER TABLE consumos
+      ADD COLUMN IF NOT EXISTS fecha_caja DATE;
+    `);
+    console.log('? Columnas fecha_creacion y fecha_caja agregadas a consumos');
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS consumo_items (
         id SERIAL PRIMARY KEY,
         consumo_id INTEGER NOT NULL,
@@ -198,11 +138,51 @@ const initDatabase = async () => {
     `);
     console.log('? Tabla consumo_items creada');
 
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_restaurant ON orders(restaurant_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_dishes_menu ON dishes(menu_id);');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_menus_restaurant ON menus(restaurant_id);');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS medios_pago (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        activo BOOLEAN DEFAULT true
+      );
+    `);
+    console.log('? Tabla medios_pago creada');
+
+    await pool.query(`
+      ALTER TABLE medios_pago
+      ADD COLUMN IF NOT EXISTS orden INTEGER;
+    `);
+    console.log('? Columna orden agregada a medios_pago');
+
+    await pool.query(`
+      ALTER TABLE consumos
+      ADD COLUMN IF NOT EXISTS medio_pago_id INTEGER REFERENCES medios_pago(id) ON DELETE SET NULL;
+    `);
+    console.log('? Columna medio_pago_id agregada a consumos');
+
+    await pool.query(`
+      ALTER TABLE productos
+      ADD COLUMN IF NOT EXISTS proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL;
+    `);
+    console.log('? Columna proveedor_id agregada a productos');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS consumo_pagos (
+        id SERIAL PRIMARY KEY,
+        consumo_id INTEGER NOT NULL,
+        medio_pago_id INTEGER NOT NULL,
+        monto DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        user_id INTEGER,
+        created_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_consumo_pagos_consumo FOREIGN KEY (consumo_id) REFERENCES consumos(id) ON DELETE CASCADE,
+        CONSTRAINT fk_consumo_pagos_medio_pago FOREIGN KEY (medio_pago_id) REFERENCES medios_pago(id) ON DELETE RESTRICT,
+        CONSTRAINT fk_consumo_pagos_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('? Tabla consumo_pagos creada');
+
     await pool.query('CREATE INDEX IF NOT EXISTS idx_productos_activo ON productos(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_productos_proveedor ON productos(proveedor_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_grupo1prod_activo ON grupo1prod(activo);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_grupo2prod_activo ON grupo2prod(activo);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_clientes_activo ON clientes(activo);');
@@ -210,6 +190,67 @@ const initDatabase = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_mesa ON consumos(mesa_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_cliente ON consumos(cliente_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_estado ON consumos(estado);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumos_fecha_caja ON consumos(fecha_caja);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_medios_pago_activo ON medios_pago(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumo_pagos_consumo ON consumo_pagos(consumo_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumo_pagos_medio_pago ON consumo_pagos(medio_pago_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_consumo_pagos_created_at ON consumo_pagos(created_at);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS proveedores (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        cuit VARCHAR(50),
+        telefono VARCHAR(50),
+        email VARCHAR(255),
+        direccion VARCHAR(255),
+        observaciones TEXT,
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('? Tabla proveedores creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_proveedores_activo ON proveedores(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_proveedores_nombre ON proveedores(nombre);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS producto_proveedor (
+        id SERIAL PRIMARY KEY,
+        producto_id INTEGER NOT NULL,
+        proveedor_id INTEGER NOT NULL,
+        precio_por_litro DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        precio_barril DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        precio_venta_sugerido DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_producto_proveedor_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+        CONSTRAINT fk_producto_proveedor_proveedor FOREIGN KEY (proveedor_id) REFERENCES proveedores(id) ON DELETE CASCADE,
+        CONSTRAINT uq_producto_proveedor UNIQUE (producto_id, proveedor_id)
+      );
+    `);
+    console.log('? Tabla producto_proveedor creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_producto_proveedor_producto ON producto_proveedor(producto_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_producto_proveedor_proveedor ON producto_proveedor(proveedor_id);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS parametros_productos (
+        id SERIAL PRIMARY KEY,
+        cantidad_barril_cerveza DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        coeficiente_precio_venta DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('? Tabla parametros_productos creada');
+    await pool.query(`
+      ALTER TABLE parametros_productos
+      ALTER COLUMN coeficiente_precio_venta TYPE DECIMAL(10, 2);
+    `);
+    console.log('? Columna coeficiente_precio_venta ajustada a 2 decimales');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_parametros_productos_activo ON parametros_productos(activo);');
 
     await pool.query(`
       ALTER TABLE productos
@@ -291,6 +332,15 @@ const initDatabase = async () => {
       console.log('? Datos de prueba para mesas insertados');
     }
 
+    const mediosPagoCheck = await pool.query('SELECT COUNT(*) FROM medios_pago');
+    if (mediosPagoCheck.rows[0].count === '0') {
+      await pool.query('INSERT INTO medios_pago (nombre, descripcion, activo) VALUES ($1, $2, $3)', ['Efectivo', 'Pago en efectivo al momento de la cuenta', true]);
+      await pool.query('INSERT INTO medios_pago (nombre, descripcion, activo) VALUES ($1, $2, $3)', ['Tarjeta de débito', 'Pago con tarjeta de débito', true]);
+      await pool.query('INSERT INTO medios_pago (nombre, descripcion, activo) VALUES ($1, $2, $3)', ['Tarjeta de crédito', 'Pago con tarjeta de crédito', true]);
+      await pool.query('INSERT INTO medios_pago (nombre, descripcion, activo) VALUES ($1, $2, $3)', ['Transferencia bancaria', 'Pago mediante transferencia', false]);
+      console.log('? Datos de prueba para medios_pago insertados');
+    }
+
     const consumoCheck = await pool.query('SELECT COUNT(*) FROM consumos');
     if (consumoCheck.rows[0].count === '0') {
       const mesaResult = await pool.query('SELECT id FROM mesas ORDER BY id LIMIT 1');
@@ -314,36 +364,51 @@ const initDatabase = async () => {
       }
     }
 
+    const proveedoresCheck = await pool.query('SELECT COUNT(*) FROM proveedores');
+    if (proveedoresCheck.rows[0].count === '0') {
+      await pool.query(
+        'INSERT INTO proveedores (nombre, cuit, telefono, email, direccion, observaciones, activo) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        ['Distribuidora del Norte', '30-12345678-9', '555-3000', 'ventas@distnorte.com', 'Av. Comercio 500', 'Entrega los lunes', true]
+      );
+      await pool.query(
+        'INSERT INTO proveedores (nombre, cuit, telefono, email, direccion, observaciones, activo) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        ['Bebidas y Más S.A.', '20-87654321-5', '555-4000', 'contacto@bebidasymas.com', 'Calle Gastronómica 88', '', true]
+      );
+      console.log('? Datos de prueba para proveedores insertados');
+    }
+
+    const productoProveedorCheck = await pool.query('SELECT COUNT(*) FROM producto_proveedor');
+    if (productoProveedorCheck.rows[0].count === '0') {
+      const productoResult = await pool.query('SELECT id FROM productos ORDER BY id LIMIT 1');
+      const proveedorResult = await pool.query('SELECT id FROM proveedores ORDER BY id LIMIT 1');
+      const productoId = productoResult.rows[0]?.id;
+      const proveedorId = proveedorResult.rows[0]?.id;
+
+      if (productoId && proveedorId) {
+        await pool.query(
+          'INSERT INTO producto_proveedor (producto_id, proveedor_id, precio_por_litro, precio_barril, precio_venta_sugerido, activo) VALUES ($1, $2, $3, $4, $5, $6)',
+          [productoId, proveedorId, 3.5, 1200.0, 6.0, true]
+        );
+        console.log('? Datos de prueba para producto_proveedor insertados');
+      }
+    }
+
+    const parametrosProductosCheck = await pool.query('SELECT COUNT(*) FROM parametros_productos');
+    if (parametrosProductosCheck.rows[0].count === '0') {
+      await pool.query(
+        'INSERT INTO parametros_productos (cantidad_barril_cerveza, coeficiente_precio_venta, activo) VALUES ($1, $2, $3)',
+        [50.0, 2.0, true]
+      );
+      console.log('? Datos de prueba para parametros_productos insertados');
+    }
+
     const restaurantCheck = await pool.query('SELECT COUNT(*) FROM restaurants');
     if (restaurantCheck.rows[0].count === '0') {
-      const restaurantResult = await pool.query(
+      await pool.query(
         'INSERT INTO restaurants (name, description, address, phone, email) VALUES ($1, $2, $3, $4, $5) RETURNING id',
         ['Restaurante Principal', 'Restaurante de prueba', 'Calle Principal 123', '555-1234', 'info@gastro.com']
       );
-
-      const restaurantId = restaurantResult.rows[0].id;
-
-      const menuResult = await pool.query(
-        'INSERT INTO menus (restaurant_id, name, description) VALUES ($1, $2, $3) RETURNING id',
-        [restaurantId, 'Men� Principal', 'Men� del d�a']
-      );
-
-      const menuId = menuResult.rows[0].id;
-
-      const dishes = [
-        ['Pizza Margherita', 'Cl�sica pizza italiana', 12.99, 'Pizzas'],
-        ['Hamburguesa Especial', 'Con queso y bacon', 10.99, 'Hamburguesas'],
-        ['Ensalada C�sar', 'Fresca ensalada con pollo', 8.99, 'Ensaladas'],
-        ['Pasta Carbonara', 'Aut�ntica receta italiana', 13.99, 'Pastas'],
-      ];
-
-      for (const dish of dishes) {
-        await pool.query(
-          'INSERT INTO dishes (menu_id, name, description, price, category, available) VALUES ($1, $2, $3, $4, $5, $6)',
-          [menuId, dish[0], dish[1], dish[2], dish[3], true]
-        );
-      }
-      console.log('? Datos de prueba insertados');
+      console.log('? Datos de prueba para restaurants insertados');
     }
 
     console.log('\n? Base de datos inicializada correctamente');

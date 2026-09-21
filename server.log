@@ -1,0 +1,7 @@
+
+> gastro-back@1.0.0 dev
+> ts-node src/index.ts
+
+◇ injected env (7) from .env // tip: ⌘ suppress logs { quiet: true }
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+Servidor backend corriendo en puerto 3000
