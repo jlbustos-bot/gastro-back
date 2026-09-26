@@ -253,6 +253,19 @@ const initDatabase = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_parametros_productos_activo ON parametros_productos(activo);');
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS condicion_cta_cte (
+        id SERIAL PRIMARY KEY,
+        descripcion VARCHAR(255) NOT NULL,
+        cantidad_dias INTEGER NOT NULL DEFAULT 0,
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('? Tabla condicion_cta_cte creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_condicion_cta_cte_activo ON condicion_cta_cte(activo);');
+
+    await pool.query(`
       ALTER TABLE productos
       DROP CONSTRAINT IF EXISTS fk_productos_grupo1prod;
     `);
@@ -400,6 +413,23 @@ const initDatabase = async () => {
         [50.0, 2.0, true]
       );
       console.log('? Datos de prueba para parametros_productos insertados');
+    }
+
+    const condicionCtaCteCheck = await pool.query('SELECT COUNT(*) FROM condicion_cta_cte');
+    if (condicionCtaCteCheck.rows[0].count === '0') {
+      await pool.query(
+        'INSERT INTO condicion_cta_cte (descripcion, cantidad_dias, activo) VALUES ($1, $2, $3)',
+        ['Contado', 0, true]
+      );
+      await pool.query(
+        'INSERT INTO condicion_cta_cte (descripcion, cantidad_dias, activo) VALUES ($1, $2, $3)',
+        ['Cuenta corriente a 30 días', 30, true]
+      );
+      await pool.query(
+        'INSERT INTO condicion_cta_cte (descripcion, cantidad_dias, activo) VALUES ($1, $2, $3)',
+        ['Cuenta corriente a 60 días', 60, false]
+      );
+      console.log('? Datos de prueba para condicion_cta_cte insertados');
     }
 
     const restaurantCheck = await pool.query('SELECT COUNT(*) FROM restaurants');

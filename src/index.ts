@@ -16,6 +16,8 @@ import reporteRoutes from './routes/reporteRoutes';
 import proveedorRoutes from './routes/proveedorRoutes';
 import productoProveedorRoutes from './routes/productoProveedorRoutes';
 import parametroProductoRoutes from './routes/parametroProductoRoutes';
+import userRoutes from './routes/userRoutes';
+import condicionCtaCteRoutes from './routes/condicionCtaCteRoutes';
 
 dotenv.config();
 
@@ -45,6 +47,8 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/producto-proveedor', productoProveedorRoutes);
 app.use('/api/parametros-productos', parametroProductoRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/condiciones-cta-cte', condicionCtaCteRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
