@@ -266,6 +266,20 @@ const initDatabase = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_condicion_cta_cte_activo ON condicion_cta_cte(activo);');
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS parametros_impresion (
+        id SERIAL PRIMARY KEY,
+        cantidad_copias INTEGER NOT NULL DEFAULT 1,
+        impresora_informes VARCHAR(255),
+        impresora_ticket VARCHAR(255),
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log('? Tabla parametros_impresion creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_parametros_impresion_activo ON parametros_impresion(activo);');
+
+    await pool.query(`
       ALTER TABLE productos
       DROP CONSTRAINT IF EXISTS fk_productos_grupo1prod;
     `);
@@ -430,6 +444,15 @@ const initDatabase = async () => {
         ['Cuenta corriente a 60 días', 60, false]
       );
       console.log('? Datos de prueba para condicion_cta_cte insertados');
+    }
+
+    const parametrosImpresionCheck = await pool.query('SELECT COUNT(*) FROM parametros_impresion');
+    if (parametrosImpresionCheck.rows[0].count === '0') {
+      await pool.query(
+        'INSERT INTO parametros_impresion (cantidad_copias, impresora_informes, impresora_ticket, activo) VALUES ($1, $2, $3, $4)',
+        [1, 'Microsoft Print to PDF', 'Microsoft Print to PDF', true]
+      );
+      console.log('? Datos de prueba para parametros_impresion insertados');
     }
 
     const restaurantCheck = await pool.query('SELECT COUNT(*) FROM restaurants');
