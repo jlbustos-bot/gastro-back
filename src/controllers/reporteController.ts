@@ -75,6 +75,7 @@ export const ventaDiaria = async (req: AuthRequest, res: Response): Promise<void
       `
       SELECT c.id, m.numero AS mesa_numero,
              CONCAT(cl.nombre, ' ', cl.apellido) AS cliente_nombre,
+             c.nombre,
              c.total,
              (SELECT string_agg(mp.nombre, ', ' ORDER BY cp.id)
               FROM consumo_pagos cp

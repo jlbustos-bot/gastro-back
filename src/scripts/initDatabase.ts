@@ -126,6 +126,12 @@ const initDatabase = async () => {
     console.log('? Columnas fecha_creacion y fecha_caja agregadas a consumos');
 
     await pool.query(`
+      ALTER TABLE consumos
+      ADD COLUMN IF NOT EXISTS nombre VARCHAR(255);
+    `);
+    console.log('? Columna nombre agregada a consumos');
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS consumo_items (
         id SERIAL PRIMARY KEY,
         consumo_id INTEGER NOT NULL,
@@ -278,6 +284,41 @@ const initDatabase = async () => {
     `);
     console.log('? Tabla parametros_impresion creada');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_parametros_impresion_activo ON parametros_impresion(activo);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS canillas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        producto_id INTEGER,
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_canillas_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('? Tabla canillas creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_canillas_activo ON canillas(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_canillas_producto ON canillas(producto_id);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pinchada_canillas (
+        id SERIAL PRIMARY KEY,
+        canilla_id INTEGER,
+        producto_id INTEGER NOT NULL,
+        fecha_inicio DATE NOT NULL DEFAULT CURRENT_DATE,
+        fecha_fin DATE,
+        cantidad_vendida DECIMAL(10, 2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_pinchada_canilla FOREIGN KEY (canilla_id) REFERENCES canillas(id) ON DELETE SET NULL,
+        CONSTRAINT fk_pinchada_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
+        CONSTRAINT ck_pinchada_fechas CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio)
+      );
+    `);
+    console.log('? Tabla pinchada_canillas creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_pinchada_canilla ON pinchada_canillas(canilla_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_pinchada_producto ON pinchada_canillas(producto_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_pinchada_fecha_inicio ON pinchada_canillas(fecha_inicio);');
 
     await pool.query(`
       ALTER TABLE productos
@@ -453,6 +494,48 @@ const initDatabase = async () => {
         [1, 'Microsoft Print to PDF', 'Microsoft Print to PDF', true]
       );
       console.log('? Datos de prueba para parametros_impresion insertados');
+    }
+
+    const canillasCheck = await pool.query('SELECT COUNT(*) FROM canillas');
+    if (canillasCheck.rows[0].count === '0') {
+      const cervezaResult = await pool.query(
+        'SELECT id FROM productos WHERE grupo1prod = 1 ORDER BY id LIMIT 1'
+      );
+      const cervezaId = cervezaResult.rows[0]?.id;
+
+      if (cervezaId) {
+        await pool.query(
+          'INSERT INTO canillas (nombre, producto_id, activo) VALUES ($1, $2, $3)',
+          ['Canilla 1', cervezaId, true]
+        );
+        await pool.query(
+          'INSERT INTO canillas (nombre, producto_id, activo) VALUES ($1, $2, $3)',
+          ['Canilla 2', cervezaId, true]
+        );
+        await pool.query(
+          'INSERT INTO canillas (nombre, producto_id, activo) VALUES ($1, $2, $3)',
+          ['Canilla 3', cervezaId, false]
+        );
+console.log('? Datos de prueba para canillas insertados');
+      }
+    }
+
+    const pinchadaCheck = await pool.query('SELECT COUNT(*) FROM pinchada_canillas');
+    if (pinchadaCheck.rows[0].count === '0') {
+      const canillaResult = await pool.query('SELECT id FROM canillas WHERE activo = true ORDER BY id LIMIT 1');
+      const cervezaResult = await pool.query(
+        'SELECT id FROM productos WHERE grupo1prod = 1 ORDER BY id LIMIT 1'
+      );
+      const canillaId = canillaResult.rows[0]?.id;
+      const cervezaId = cervezaResult.rows[0]?.id;
+
+      if (cervezaId) {
+        await pool.query(
+          'INSERT INTO pinchada_canillas (canilla_id, producto_id, fecha_inicio, fecha_fin, cantidad_vendida) VALUES ($1, $2, $3, $4, $5)',
+          [canillaId ?? null, cervezaId, new Date().toISOString().slice(0, 10), null, 0]
+        );
+        console.log('? Datos de prueba para pinchada_canillas insertados');
+      }
     }
 
     const restaurantCheck = await pool.query('SELECT COUNT(*) FROM restaurants');

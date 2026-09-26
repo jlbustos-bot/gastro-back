@@ -141,6 +141,17 @@ export const createConsumo = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    let nombre = rawBody.nombre !== undefined && rawBody.nombre !== null ? String(rawBody.nombre).trim() : '';
+    if (clienteId !== null) {
+      const clienteResult = await client.query('SELECT nombre, apellido FROM clientes WHERE id = $1', [clienteId]);
+      if (clienteResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'El cliente seleccionado no existe' });
+        return;
+      }
+      nombre = `${clienteResult.rows[0].nombre} ${clienteResult.rows[0].apellido}`.trim();
+    }
+
     const mesaResult = await client.query('SELECT * FROM mesas WHERE id = $1', [mesaId]);
     if (mesaResult.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -160,8 +171,8 @@ export const createConsumo = async (req: AuthRequest, res: Response): Promise<vo
     const { fechaCreacion, fechaCaja } = getFechasConsumo();
 
     const consumoResult = await client.query(
-      'INSERT INTO consumos (mesa_id, cliente_id, estado, total, medio_pago_id, fecha_creacion, fecha_caja) VALUES ($1, $2, $3, 0, $4, $5, $6) RETURNING *',
-      [mesaId, clienteId, estado, medioPagoId, fechaCreacion, fechaCaja]
+      'INSERT INTO consumos (mesa_id, cliente_id, nombre, estado, total, medio_pago_id, fecha_creacion, fecha_caja) VALUES ($1, $2, $3, $4, 0, $5, $6, $7) RETURNING *',
+      [mesaId, clienteId, nombre, estado, medioPagoId, fechaCreacion, fechaCaja]
     );
     const consumo = consumoResult.rows[0];
 
@@ -340,6 +351,17 @@ export const updateConsumo = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    let nombre = rawBody.nombre !== undefined && rawBody.nombre !== null ? String(rawBody.nombre).trim() : (current.nombre ?? '');
+    if (clienteId !== null) {
+      const clienteResult = await client.query('SELECT nombre, apellido FROM clientes WHERE id = $1', [clienteId]);
+      if (clienteResult.rows.length === 0) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: 'El cliente seleccionado no existe' });
+        return;
+      }
+      nombre = `${clienteResult.rows[0].nombre} ${clienteResult.rows[0].apellido}`.trim();
+    }
+
     if (medioPagoId !== null && isNaN(medioPagoId)) {
       await client.query('ROLLBACK');
       res.status(400).json({ error: 'El medio de pago es inválido' });
@@ -399,8 +421,8 @@ export const updateConsumo = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     await client.query(
-      'UPDATE consumos SET mesa_id = $1, cliente_id = $2, estado = $3, medio_pago_id = $4, updated_at = NOW() WHERE id = $5',
-      [mesaId, clienteId, estado, medioPagoId, id]
+      'UPDATE consumos SET mesa_id = $1, cliente_id = $2, nombre = $3, estado = $4, medio_pago_id = $5, updated_at = NOW() WHERE id = $6',
+      [mesaId, clienteId, nombre, estado, medioPagoId, id]
     );
 
     await recalculateTotal(client, Number(id));
