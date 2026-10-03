@@ -1,6 +1,7 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { checkDatabaseConnection } from './config/database';
 
 // Routes
 import authRoutes from './routes/authRoutes';
@@ -33,8 +34,12 @@ app.use(express.json());
 app.use(cors());
 
 // Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'Backend operativo' });
+app.get('/api/health', async (req, res) => {
+  const db = await checkDatabaseConnection();
+  res.status(db.ok ? 200 : 503).json({
+    status: db.ok ? 'Backend operativo' : 'Backend con problema de base de datos',
+    database: db,
+  });
 });
 
 // Routes
