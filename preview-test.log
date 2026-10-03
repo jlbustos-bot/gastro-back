@@ -1,0 +1,7 @@
+
+> gastro-back@1.0.0 start
+> node dist/index.js
+
+◇ injected env (7) from .env // tip: ⌘ override existing { override: true }
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+Servidor backend corriendo en puerto 3000
