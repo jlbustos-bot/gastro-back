@@ -29,7 +29,7 @@ export const getRestaurantById = async (req: AuthRequest, res: Response): Promis
 
 export const createRestaurant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, description, address, phone, email } = req.body;
+    const { name, description, address, phone, email, logo } = req.body;
 
     if (!name || !address || !phone || !email) {
       res.status(400).json({ error: 'Faltan campos requeridos' });
@@ -37,8 +37,8 @@ export const createRestaurant = async (req: AuthRequest, res: Response): Promise
     }
 
     const result = await pool.query(
-      'INSERT INTO restaurants (name, description, address, phone, email) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, description, address, phone, email]
+      'INSERT INTO restaurants (name, description, address, phone, email, logo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [name, description, address, phone, email, logo || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -50,11 +50,11 @@ export const createRestaurant = async (req: AuthRequest, res: Response): Promise
 export const updateRestaurant = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, description, address, phone, email } = req.body;
+    const { name, description, address, phone, email, logo } = req.body;
 
     const result = await pool.query(
-      'UPDATE restaurants SET name = COALESCE($1, name), description = COALESCE($2, description), address = COALESCE($3, address), phone = COALESCE($4, phone), email = COALESCE($5, email) WHERE id = $6 RETURNING *',
-      [name, description, address, phone, email, id]
+      'UPDATE restaurants SET name = COALESCE($1, name), description = COALESCE($2, description), address = COALESCE($3, address), phone = COALESCE($4, phone), email = COALESCE($5, email), logo = COALESCE($6, logo) WHERE id = $7 RETURNING *',
+      [name, description, address, phone, email, logo, id]
     );
 
     if (result.rows.length === 0) {

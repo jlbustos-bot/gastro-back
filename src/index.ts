@@ -5,9 +5,23 @@ import dotenv from 'dotenv';
 // Routes
 import authRoutes from './routes/authRoutes';
 import restaurantRoutes from './routes/restaurantRoutes';
-import dishRoutes from './routes/dishRoutes';
-import orderRoutes from './routes/orderRoutes';
+import productoRoutes from './routes/productoRoutes';
 import grupo1prodRoutes from './routes/grupo1prodRoutes';
+import grupo2prodRoutes from './routes/grupo2prodRoutes';
+import clienteRoutes from './routes/clienteRoutes';
+import mesaRoutes from './routes/mesaRoutes';
+import consumoRoutes from './routes/consumoRoutes';
+import medioPagoRoutes from './routes/medioPagoRoutes';
+import reporteRoutes from './routes/reporteRoutes';
+import proveedorRoutes from './routes/proveedorRoutes';
+import productoProveedorRoutes from './routes/productoProveedorRoutes';
+import parametroProductoRoutes from './routes/parametroProductoRoutes';
+import userRoutes from './routes/userRoutes';
+import condicionCtaCteRoutes from './routes/condicionCtaCteRoutes';
+import parametroImpresionRoutes from './routes/parametroImpresionRoutes';
+import canillaRoutes from './routes/canillaRoutes';
+import pinchadaRoutes from './routes/pinchadaRoutes';
+import recetaRoutes from './routes/recetaRoutes';
 
 dotenv.config();
 
@@ -26,9 +40,23 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
-app.use('/api/dishes', dishRoutes);
-app.use('/api/orders', orderRoutes);
+app.use('/api/productos', productoRoutes);
 app.use('/api/grupo1prod', grupo1prodRoutes);
+app.use('/api/grupo2prod', grupo2prodRoutes);
+app.use('/api/clientes', clienteRoutes);
+app.use('/api/mesas', mesaRoutes);
+app.use('/api/consumos', consumoRoutes);
+app.use('/api/medios-pago', medioPagoRoutes);
+app.use('/api/reportes', reporteRoutes);
+app.use('/api/proveedores', proveedorRoutes);
+app.use('/api/producto-proveedor', productoProveedorRoutes);
+app.use('/api/parametros-productos', parametroProductoRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/condiciones-cta-cte', condicionCtaCteRoutes);
+app.use('/api/parametros-impresion', parametroImpresionRoutes);
+app.use('/api/canillas', canillaRoutes);
+app.use('/api/pinchadas', pinchadaRoutes);
+app.use('/api/recetas', recetaRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
