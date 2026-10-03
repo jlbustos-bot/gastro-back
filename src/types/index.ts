@@ -28,6 +28,7 @@ export interface Producto {
   grupo2prod?: number | null;
   proveedor_id?: number | null;
   precioventa: number;
+  preciocompra?: number;
   activo: boolean;
 }
 
@@ -128,6 +129,37 @@ export interface ParametroProducto {
   cantidad_barril_cerveza: number;
   coeficiente_precio_venta: number;
   activo: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface RecetaComponente {
+  id?: number;
+  receta_id?: number;
+  producto_id?: number | null;
+  producto_nombre?: string | null;
+  nombre: string;
+  cantidad: number;
+  unidad?: string;
+  costo_unitario: number;
+  costo_total: number;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+export interface Receta {
+  id?: number;
+  nombre: string;
+  producto_id?: number | null;
+  producto_nombre?: string | null;
+  producto_precioventa?: number;
+  descripcion?: string;
+  cantidad_rinde: number;
+  unidad?: string;
+  costo_total: number;
+  observaciones?: string;
+  activo: boolean;
+  componentes?: RecetaComponente[];
   created_at?: Date;
   updated_at?: Date;
 }

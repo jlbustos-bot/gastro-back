@@ -21,6 +21,7 @@ import condicionCtaCteRoutes from './routes/condicionCtaCteRoutes';
 import parametroImpresionRoutes from './routes/parametroImpresionRoutes';
 import canillaRoutes from './routes/canillaRoutes';
 import pinchadaRoutes from './routes/pinchadaRoutes';
+import recetaRoutes from './routes/recetaRoutes';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/condiciones-cta-cte', condicionCtaCteRoutes);
 app.use('/api/parametros-impresion', parametroImpresionRoutes);
 app.use('/api/canillas', canillaRoutes);
 app.use('/api/pinchadas', pinchadaRoutes);
+app.use('/api/recetas', recetaRoutes);
 
 // Error handling
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

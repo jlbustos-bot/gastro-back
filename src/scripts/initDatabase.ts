@@ -173,6 +173,12 @@ const initDatabase = async () => {
     console.log('? Columna proveedor_id agregada a productos');
 
     await pool.query(`
+      ALTER TABLE productos
+      ADD COLUMN IF NOT EXISTS preciocompra DECIMAL(10, 2) NOT NULL DEFAULT 0;
+    `);
+    console.log('? Columna preciocompra agregada a productos');
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS consumo_pagos (
         id SERIAL PRIMARY KEY,
         consumo_id INTEGER NOT NULL,
@@ -319,6 +325,46 @@ const initDatabase = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_pinchada_canilla ON pinchada_canillas(canilla_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_pinchada_producto ON pinchada_canillas(producto_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_pinchada_fecha_inicio ON pinchada_canillas(fecha_inicio);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS recetas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        producto_id INTEGER,
+        descripcion TEXT,
+        cantidad_rinde DECIMAL(10, 2) NOT NULL DEFAULT 1,
+        unidad VARCHAR(50) DEFAULT 'unidad',
+        costo_total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        observaciones TEXT,
+        activo BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_recetas_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('? Tabla recetas creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_recetas_activo ON recetas(activo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_recetas_producto ON recetas(producto_id);');
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS receta_componentes (
+        id SERIAL PRIMARY KEY,
+        receta_id INTEGER NOT NULL,
+        producto_id INTEGER,
+        nombre VARCHAR(255) NOT NULL,
+        cantidad DECIMAL(10, 3) NOT NULL DEFAULT 1,
+        unidad VARCHAR(50) DEFAULT 'unidad',
+        costo_unitario DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        costo_total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        CONSTRAINT fk_receta_componentes_receta FOREIGN KEY (receta_id) REFERENCES recetas(id) ON DELETE CASCADE,
+        CONSTRAINT fk_receta_componentes_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+      );
+    `);
+    console.log('? Tabla receta_componentes creada');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_receta_componentes_receta ON receta_componentes(receta_id);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_receta_componentes_producto ON receta_componentes(producto_id);');
 
     await pool.query(`
       ALTER TABLE productos
